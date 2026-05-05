@@ -1,0 +1,14 @@
+{
+  "name": "miprimerproyecto",
+  "version": "1.0.0",
+  "description": "Gestor de Entreadas con Google Maps",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Build complete'",
+    "start": "echo 'Server is running'"
+  },
+  "keywords": ["entregas", "maps", "google"],
+  "author": "",
+  "license": "ISC"
+}
