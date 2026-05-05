@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Entregas con Google Maps</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-family: Arial, sans-serif;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin: 5px 0;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #38a169;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+            font-size: 0.85em;
+            padding: 5px 10px;
+        }
+
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+
+        .btn-warning {
+            background: #ed8936;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #dd6b20;
+        }
+
+        .addresses-list {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .address-item {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .address-item.selected {
+            background: #ebf4ff;
+            border-left-color: #48bb78;
+        }
+
+        .address-info {
+            flex: 1;
+            font-size: 0.9em;
+        }
+
+        .address-info strong {
+            display: block;
+            color: #333;
+        }
+
+        .address-info small {
+            color: #666;
+        }
+
+        .map-container {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        #map {
+            width: 100%;
+            height: 600px;
+        }
+
+        .stats {
+            background: #f7fafc;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .stats p {
+            margin: 5px 0;
+            color: #333;
+        }
+
+        .stats strong {
+            color: #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+
+        .route-info {
+            background: #edf2f7;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.85em;
+        }
+
+        .route-info p {
+            margin: 5px 0;
+            color: #333;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            #map {
+                height: 400px;
+            }
+        }
+
+        .scrollable {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Panel Izquierdo -->
+        <div class="panel">
+            <h2>📍 Gestor de Entregas</h2>
+
+            <!-- Formulario para agregar direcciones -->
+            <div class="form-group">
+                <label for="addressName">Nombre de Entrega</label>
+                <input type="text" id="addressName" placeholder="Ej: Cliente Juan">
+            </div>
+
+            <div class="form-group">
+                <label for="addressInput">Dirección Completa</label>
+                <input type="text" id="addressInput" placeholder="Ej: Calle Principal 123, Ciudad">
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notas (Opcional)</label>
+                <textarea id="notes" placeholder="Teléfono, horario, instrucciones..." rows="3"></textarea>
+            </div>
+
+            <button class="btn btn-primary" onclick="addAddress()">+ Agregar Dirección</button>
+
+            <h2 style="margin-top: 20px;">📦 Entregas Agregadas</h2>
+
+            <div class="addresses-list">
+                <div id="addressesList" class="empty-state">
+                    No hay direcciones agregadas
+                </div>
+            </div>
+
+            <button class="btn btn-secondary" id="optimizeBtn" onclick="optimizeRoute()" style="display: none;">
+                🚀 Optimizar Ruta
+            </button>
+
+            <button class="btn btn-warning" id="clearBtn" onclick="clearAll()" style="display: none;">
+                🗑️ Borrar Todo
+            </button>
+
+            <div id="stats" class="stats" style="display: none;"></div>
+        </div>
+
+        <!-- Panel Derecho - Mapa -->
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let addresses = [];
+        let markers = [];
+        let polylines = [];
+        let directionsService;
+        let directionsDisplay;
+
+        // Inicializar el mapa
+        function initMap() {
+            const initialLocation = { lat: 40.7128, lng: -74.0060 }; // Nueva York por defecto
+
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 12,
+                center: initialLocation,
+                styles: [
+                    {
+                        featureType: "all",
+                        elementType: "labels.text.fill",
+                        stylers: [{ color: "#666666" }]
+                    }
+                ]
+            });
+
+            directionsService = new google.maps.DirectionsService();
+            directionsDisplay = new google.maps.DirectionsRenderer({
+                map: map,
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: '#667eea',
+                    strokeWeight: 4,
+                    strokeOpacity: 0.7
+                }
+            });
+        }
+
+        // Agregar una nueva dirección
+        function addAddress() {
+            const name = document.getElementById('addressName').value.trim();
+            const address = document.getElementById('addressInput').value.trim();
+            const notes = document.getElementById('notes').value.trim();
+
+            if (!name || !address) {
+                alert('Por favor completa el nombre y la dirección');
+                return;
+            }
+
+            const newAddress = {
+                id: Date.now(),
+                name: name,
+                address: address,
+                notes: notes,
+                lat: null,
+                lng: null
+            };
+
+            // Geocodificar la dirección
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ address: address }, (results, status) => {
+                if (status === 'OK') {
+                    newAddress.lat = results[0].geometry.location.lat();
+                    newAddress.lng = results[0].geometry.location.lng();
+                    addresses.push(newAddress);
+                    updateAddressesList();
+                    updateMap();
+                    clearForm();
+                } else {
+                    alert('No se encontró la dirección: ' + address);
+                }
+            });
+        }
+
+        // Actualizar la lista de direcciones
+        function updateAddressesList() {
+            const list = document.getElementById('addressesList');
+
+            if (addresses.length === 0) {
+                list.innerHTML = '<div class="empty-state">No hay direcciones agregadas</div>';
+                document.getElementById('optimizeBtn').style.display = 'none';
+                document.getElementById('clearBtn').style.display = 'none';
+                document.getElementById('stats').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('optimizeBtn').style.display = 'block';
+            document.getElementById('clearBtn').style.display = 'block';
+
+            list.innerHTML = addresses.map((addr, index) => `
+                <div class="address-item">
+                    <div class="address-info">
+                        <strong>${index + 1}. ${addr.name}</strong>
+                        <small>${addr.address}</small>
+                        ${addr.notes ? `<small style="color: #888;">📝 ${addr.notes}</small>` : ''}
+                    </div>
+                    <button class="btn btn-danger" onclick="deleteAddress(${addr.id})">✕</button>
+                </div>
+            `).join('');
+
+            updateStats();
+        }
+
+        // Eliminar una dirección
+        function deleteAddress(id) {
+            addresses = addresses.filter(addr => addr.id !== id);
+            updateAddressesList();
+            updateMap();
+        }
+
+        // Limpiar formulario
+        function clearForm() {
+            document.getElementById('addressName').value = '';
+            document.getElementById('addressInput').value = '';
+            document.getElementById('notes').value = '';
+            document.getElementById('addressName').focus();
+        }
+
+        // Limpiar todo
+        function clearAll() {
+            if (confirm('¿Estás seguro de que quieres borrar todas las entregas?')) {
+                addresses = [];
+                updateAddressesList();
+                updateMap();
+            }
+        }
+
+        // Actualizar el mapa
+        function updateMap() {
+            // Limpiar marcadores y polylines anteriores
+            markers.forEach(marker => marker.setMap(null));
+            polylines.forEach(line => line.setMap(null));
+            markers = [];
+            polylines = [];
+            directionsDisplay.setMap(null);
+
+            if (addresses.length === 0) return;
+
+            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
+
+            // Agregar marcadores
+            addresses.forEach((addr, index) => {
+                const marker = new google.maps.Marker({
+                    position: { lat: addr.lat, lng: addr.lng },
+                    map: map,
+                    title: addr.name,
+                    label: {
+                        text: (index + 1).toString(),
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                    },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: colors[index % colors.length],
+                        fillOpacity: 1,
+                        strokeColor: 'white',
+                        strokeWeight: 2
+                    }
+                });
+
+                const infowindow = new google.maps.InfoWindow({
+                    content: `<div style="color: #333;"><strong>${addr.name}</strong><br>${addr.address}${addr.notes ? '<br><small>' + addr.notes + '</small>' : ''}</div>`
+                });
+
+                marker.addListener('click', () => {
+                    infowindow.open(map, marker);
+                });
+
+                markers.push(marker);
+            });
+
+            // Ajustar zoom al mapa
+            if (addresses.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                addresses.forEach(addr => {
+                    bounds.extend({ lat: addr.lat, lng: addr.lng });
+                });
+                map.fitBounds(bounds);
+            }
+
+            // Trazar ruta entre direcciones
+            if (addresses.length > 1) {
+                traceRoute();
+            }
+        }
+
+        // Trazar la ruta entre direcciones
+        function traceRoute() {
+            if (addresses.length < 2) return;
+
+            const waypoints = addresses.slice(1, -1).map(addr => ({
+                location: { lat: addr.lat, lng: addr.lng },
+                stopover: true
+            }));
+
+            const request = {
+                origin: { lat: addresses[0].lat, lng: addresses[0].lng },
+                destination: { lat: addresses[addresses.length - 1].lat, lng: addresses[addresses.length - 1].lng },
+                waypoints: waypoints,
+                travelMode: 'DRIVING',
+                optimizeWaypoints: false
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === 'OK') {
+                    directionsDisplay.setDirections(result);
+                } else {
+                    console.error('Error al trazar ruta: ' + status);
+                }
+            });
+        }
+
+        // Optimizar la ruta
+        function optimizeRoute() {
+            if (addresses.length < 2) return;
+
+            // Usar la API de DirectionsService con optimizeWaypoints
+            const waypoints = addresses.slice(1, -1).map(addr => ({
+                location: { lat: addr.lat, lng: addr.lng },
+                stopover: true
+            }));
+
+            const request = {
+                origin: { lat: addresses[0].lat, lng: addresses[0].lng },
+                destination: { lat: addresses[addresses.length - 1].lat, lng: addresses[addresses.length - 1].lng },
+                waypoints: waypoints,
+                travelMode: 'DRIVING',
+                optimizeWaypoints: true
+            };
+
+            directionsService.route(request, (result, status) => {
+                if (status === 'OK') {
+                    const route = result.routes[0];
+                    const orderedAddresses = [addresses[0]];
+
+                    route.waypoint_order.forEach(index => {
+                        orderedAddresses.push(addresses[index + 1]);
+                    });
+
+                    orderedAddresses.push(addresses[addresses.length - 1]);
+
+                    addresses = orderedAddresses;
+                    updateAddressesList();
+                    updateMap();
+                    alert('✅ Ruta optimizada correctamente');
+                } else {
+                    alert('No se pudo optimizar la ruta');
+                }
+            });
+        }
+
+        // Actualizar estadísticas
+        function updateStats() {
+            const statsDiv = document.getElementById('stats');
+            if (addresses.length === 0) {
+                statsDiv.style.display = 'none';
+                return;
+            }
+
+            statsDiv.style.display = 'block';
+            statsDiv.innerHTML = `
+                <p><strong>Total de entregas:</strong> ${addresses.length}</p>
+                <p><strong>Estado:</strong> ${addresses.length < 2 ? 'Agrega más direcciones' : 'Listo para optimizar'}</p>
+            `;
+        }
+
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            document.getElementById('addressInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addAddress();
+            });
+        });
+    </script>
+</body>
+</html>
